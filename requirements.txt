@@ -1,0 +1,12 @@
+pandas
+matplotlib
+seaborn
+statsmodels
+google-auth
+google-api-python-client
+streamlit
+plotly
+xgboost
+scikit-learn
+numpy
+shap
