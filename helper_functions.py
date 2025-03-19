@@ -447,7 +447,14 @@ def cumulative_monthly_line_chart(df, column_to_sum):
         hovermode='closest',
         template="plotly_white",
         margin=dict(l=50, r=50, t=50, b=50),
-        legend=dict(font=dict(size=12))
+        legend=dict(
+            orientation="h",           # horizontal legend
+            yanchor="bottom",
+            y=1.1,                     # moves legend above the plot
+            xanchor="center",
+            x=0.5,
+            font=dict(size=12)
+        )
     )
 
     return fig
