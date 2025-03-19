@@ -18,13 +18,17 @@ import shap
 
 
 
-def load_data_GD_API(PATH_TO_SERVICE_ACCOUNT_FILE, file_id):
+def load_data_GD_API(file_id):
+
+    """
+    Loads data from Google Drive using the service account stored in Streamlit secrets.
+    """
     
     # Define the required scopes (modify if needed)
     SCOPES = ["https://www.googleapis.com/auth/drive"]
 
     # Authenticate using service account credentials
-    creds = Credentials.from_service_account_file(PATH_TO_SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=SCOPES)
 
     # Build the Google Drive API service
     service = build("drive", "v3", credentials=creds)

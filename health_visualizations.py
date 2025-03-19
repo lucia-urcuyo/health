@@ -2,11 +2,9 @@ import helper_functions as hf
 import streamlit as st
 
 
-# Path to your downloaded credentials JSON file
-SERVICE_ACCOUNT_FILE = "/Users/luciaurcuyo/Downloads/health-data-api-449715-19ff377955bc.json"
 file_id = '1E8QYsgwoIFwLbG4hNOiqGWzHK4yy8uOHm6Yg7nBXodQ'
 
-raw_data = hf.load_data_GD_API(SERVICE_ACCOUNT_FILE, file_id)
+raw_data = hf.load_data_GD_API(file_id)
 print(raw_data)
 
 # Columns that should be numeric
