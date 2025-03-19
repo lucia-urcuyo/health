@@ -84,14 +84,11 @@ def home():
 
     st.header("Trends")
 
-    # Create columns
-    col11, col22 = st.columns(2)
 
-    hf.line_chart(data, 'Hours of Sleep', col11)
-    hf.line_chart(data, 'Gym Motivation', col11)
-
-    hf.line_chart(data, 'Healthy Eats', col22)
-    hf.line_chart(data, 'Mood of the Day', col22)
+    hf.line_chart(data, 'Hours of Sleep', st)
+    hf.line_chart(data, 'Gym Motivation', st)
+    hf.line_chart(data, 'Healthy Eats', st)
+    hf.line_chart(data, 'Mood of the Day', st)
 
 def page1():
     st.markdown("<h1 style='text-align: center;'>Monthly Comparison</h1>", unsafe_allow_html=True)
