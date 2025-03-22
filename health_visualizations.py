@@ -7,6 +7,11 @@ file_id = '1E8QYsgwoIFwLbG4hNOiqGWzHK4yy8uOHm6Yg7nBXodQ'
 raw_data = hf.load_data_GD_API(file_id)
 print(raw_data)
 
+
+# raw_data = hf.load_data()
+# raw_data = raw_data.drop(columns=["Unnamed: 0"])
+
+
 # Columns that should be numeric
 numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
 
@@ -45,7 +50,9 @@ def home():
     categorical_cols = ['Day of Week']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
-    new_data = x.iloc[-1]
+
+    new_data = x.iloc[[-1]]
+
     feature_columns = x.columns  
 
     # Make prediction
@@ -157,22 +164,5 @@ elif page == "Monthly Comparison":
 elif page == "Mood Drivers and Insights":
     page2()
 
-
-# Get Mood Prediction
-
-numeric_columns= ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
-columns_to_drop = ['Timestamp']
-categorical_cols = ['Day of Week']
-
-x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
-
-
-new_data = x.iloc[-1]
-print(new_data)
-feature_columns = x.columns  # Ensure the order matches training data
-print(feature_columns)
-predicted_probability = hf.predict_mood_probability(hf.xgb_loaded, new_data, feature_columns)
-
-print(f"Predicted Mood Probability: {predicted_probability:.2%}")  # Display as percentage
 
 

@@ -16,6 +16,9 @@ import numpy as np
 
 import shap
 
+def load_data():
+    return pd.read_csv('data.csv')
+
 
 
 def load_data_GD_API(file_id):
@@ -126,6 +129,11 @@ def barchart_pred_vs_target(pred_column_name, target_column_name, df):
     """
     df = df.copy()
 
+    # Ensure proper day order if grouping by Day of Week
+    if pred_column_name == 'Day of Week':
+        days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        df[pred_column_name] = pd.Categorical(df[pred_column_name], categories=days_order, ordered=True)
+
     # Convert the predictor column to categorical (ensures proper x-axis spacing)
     df[pred_column_name] = pd.Categorical(df[pred_column_name], ordered=True)
 
@@ -139,10 +147,6 @@ def barchart_pred_vs_target(pred_column_name, target_column_name, df):
     grouped['se'] = grouped['std'] / np.sqrt(grouped['count'])
     grouped['ci_lower'] = grouped['mean'] - 1.96 * grouped['se']
     grouped['ci_upper'] = grouped['mean'] + 1.96 * grouped['se']
-
-
-    # Display the grouped data with confidence intervals
-    print(grouped)
 
     # Visualization: Bar chart with rounded bars and proper x-axis
     fig, ax = plt.subplots(figsize=(12, 8))
@@ -373,14 +377,13 @@ def predict_mood_probability(xgb_model, new_data_point, feature_columns):
     Returns:
         float: Probability of being in a good mood (1)
     """
-    # Ensure input is a DataFrame with correct column names
+    # # Ensure input is a DataFrame with correct column names
     if isinstance(new_data_point, (list, np.ndarray)):
         new_data_point = pd.DataFrame([new_data_point], columns=feature_columns)
     elif isinstance(new_data_point, pd.Series):
         new_data_point = new_data_point.to_frame().T  # Convert Series to DataFrame
 
     # Make probability prediction
-    print(new_data_point, xgb_model, feature_columns)
     mood_probability = xgb_model.predict_proba(new_data_point)[:, 1][0]  # Probability of "Good Mood" (1)
     
     return mood_probability
