@@ -42,7 +42,7 @@ def home():
     # Prepare data for prediction
     numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
     columns_to_drop = ['Timestamp']
-    categorical_cols = ['Location']
+    categorical_cols = ['Location', 'Day of Week']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
     new_data = x.iloc[-1]
@@ -120,7 +120,7 @@ def page2():
     # ----  Bar Chart Section ----
 
     # Select predictor variable from dropdown (excluding 'Mood of the Day' and non-useful columns)
-    predictor_options = ['Caffeine Consumption', 'Hours of Sleep', 'Healthy Eats', 'Location', 'Gym', 'Alcohol Previous Day', 'Gym Previous Day', 'Vitamins Last 7 Days', 'Creatine Last 7 Days']
+    predictor_options = ['Caffeine Consumption', 'Hours of Sleep', 'Healthy Eats', 'Location', 'Gym', 'Alcohol Previous Day', 'Gym Previous Day', 'Vitamins Last 7 Days', 'Creatine Last 7 Days', 'Day of Week']
     selected_predictor = st.selectbox("Select a Predictor Variable:", predictor_options)
 
     # Add the dynamic subheading
@@ -137,7 +137,7 @@ def page2():
 
     # Recreate the input for prediction
     numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
-    categorical_cols = ['Location']
+    categorical_cols = ['Location', 'Day of Week']
     columns_to_drop = ['Timestamp']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
@@ -162,7 +162,7 @@ elif page == "Mood Drivers and Insights":
 
 numeric_columns= ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
 columns_to_drop = ['Timestamp']
-categorical_cols = ['Location']
+categorical_cols = ['Location', 'Day of Week']
 
 x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
 

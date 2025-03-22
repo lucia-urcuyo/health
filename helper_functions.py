@@ -83,6 +83,9 @@ def preprocess_data(raw_data, numeric_columns=None, columns_to_drop=None):
     # Sort the DataFrame by the Date column
     data = data.sort_values(by='Date')
 
+    # Add a column for the day of the week
+    data['Day of Week'] = data['Date'].dt.day_name()
+
     # Reset the index
     data = data.reset_index(drop=True)
 
@@ -281,7 +284,7 @@ def calculate_yesterday_val(df, column_name):
 def create_metric_st(yesterday_val, percentage_change, title, container):
 
     # Determine Color
-    color = "green" if percentage_change > 0 else "red"
+    color = "green" if percentage_change > 0 else "orange"
     high_low = "Higher" if percentage_change > 0 else "Lower"
 
     # Streamlit UI inside the container
