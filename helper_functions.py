@@ -314,14 +314,17 @@ def preprocess_data_for_modeling_binary_y(raw_data, numeric_columns=None, catego
         for col in numeric_columns:
             data[col] = pd.to_numeric(data[col], errors='coerce')  # Coerce invalid values to NaN
 
+    # Ensure the Date column is in datetime format
+    data['Date'] = pd.to_datetime(data['Date'])
+
+    # Add a column for the day of the week
+    data['Day of Week'] = data['Date'].dt.day_name()  
+
     # Convert categorical columns (if provided)
     if categorical_cols:
         label_encoder = LabelEncoder()
         for col in categorical_cols:
             data[col] = label_encoder.fit_transform(data[col])  # Converts categories into integers
-  
-    # Ensure the Date column is in datetime format
-    data['Date'] = pd.to_datetime(data['Date'])
 
     # Sort the DataFrame by the Date column
     data = data.sort_values(by='Date')
