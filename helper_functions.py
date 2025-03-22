@@ -320,11 +320,9 @@ def preprocess_data_for_modeling_binary_y(raw_data, numeric_columns=None, catego
     # Add a column for the day of the week
     data['Day of Week'] = data['Date'].dt.day_name()  
 
-    # Convert categorical columns (if provided)
+    # One-hot encode categorical columns (if provided)
     if categorical_cols:
-        label_encoder = LabelEncoder()
-        for col in categorical_cols:
-            data[col] = label_encoder.fit_transform(data[col])  # Converts categories into integers
+        data = pd.get_dummies(data, columns=categorical_cols, drop_first=True)
 
     # Sort the DataFrame by the Date column
     data = data.sort_values(by='Date')
@@ -382,6 +380,7 @@ def predict_mood_probability(xgb_model, new_data_point, feature_columns):
         new_data_point = new_data_point.to_frame().T  # Convert Series to DataFrame
 
     # Make probability prediction
+    print(new_data_point, xgb_model, feature_columns)
     mood_probability = xgb_model.predict_proba(new_data_point)[:, 1][0]  # Probability of "Good Mood" (1)
     
     return mood_probability

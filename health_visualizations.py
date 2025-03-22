@@ -42,7 +42,7 @@ def home():
     # Prepare data for prediction
     numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
     columns_to_drop = ['Timestamp']
-    categorical_cols = ['Location', 'Day of Week']
+    categorical_cols = ['Day of Week']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
     new_data = x.iloc[-1]
@@ -137,7 +137,7 @@ def page2():
 
     # Recreate the input for prediction
     numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
-    categorical_cols = ['Location', 'Day of Week']
+    categorical_cols = ['Day of Week']
     columns_to_drop = ['Timestamp']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
@@ -162,13 +162,15 @@ elif page == "Mood Drivers and Insights":
 
 numeric_columns= ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
 columns_to_drop = ['Timestamp']
-categorical_cols = ['Location', 'Day of Week']
+categorical_cols = ['Day of Week']
 
 x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
 
 
 new_data = x.iloc[-1]
+print(new_data)
 feature_columns = x.columns  # Ensure the order matches training data
+print(feature_columns)
 predicted_probability = hf.predict_mood_probability(hf.xgb_loaded, new_data, feature_columns)
 
 print(f"Predicted Mood Probability: {predicted_probability:.2%}")  # Display as percentage
