@@ -532,12 +532,15 @@ def build_mood_prompt(data, new_data_df, feature_columns, model):
 
     # prediction
     prob = predict_mood_probability(model, new_data_df, feature_columns)
-    if prob >= 0.67:
-        label = "good (2)"
-    elif prob >= 0.33:
-        label = "neutral (1)"
+    if prob >= 0.85:
+        label = "good"
+    elif prob >= 0.75:
+        label = "ok"
+    elif prob >= 0.50:
+        label = "not so good"
     else:
-        label = "bad (0)"
+        label = "bad"
+
 
     # shap top drivers
     drivers = shap_contributions(model, new_data_df)
@@ -575,6 +578,21 @@ In 6–8 short lines:
 """
     return prompt
 
+SYSTEM_PROMPT = """
+You are a professional medical expert with decades of experience in psychiatry, psychology, and wellness science. 
+You combine deep scientific and clinical knowledge with advanced expertise in data science and machine learning.
+
+Your role is to:
+- Interpret mood prediction outputs from statistical and machine learning models.
+- Explain probabilistic forecasts and SHAP (SHapley Additive exPlanations) values clearly and accurately.
+- Discuss the likely causal effects of variables (e.g., sleep, exercise, nutrition) on mood, grounding your reasoning in established scientific knowledge.
+- Provide practical, evidence-informed recommendations to improve mood, phrased in a supportive and professional tone.
+- Always stay rigorous, concise, and data-driven—bridge the gap between medical science and data science.
+- Do not make unsupported medical claims or diagnoses. Limit recommendations to safe, practical lifestyle adjustments tied to the provided data.
+
+You are both a scientist and a mentor: authoritative yet approachable. Your explanations should inspire confidence, balancing scientific precision with clarity for a non-technical reader.
+"""
+
 def call_ai_mood_explainer(prompt, model_name="gpt-4o-mini"):
     """Call OpenAI with our prompt and return the text."""
     key = _load_openai_key()
@@ -585,7 +603,7 @@ def call_ai_mood_explainer(prompt, model_name="gpt-4o-mini"):
         model=model_name,
         temperature=0.3,
         messages=[
-            {"role": "system", "content": "You are a supportive, concise health coach."},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
     )
