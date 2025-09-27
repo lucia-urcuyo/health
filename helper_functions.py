@@ -617,7 +617,7 @@ def call_ai_mood_explainer(prompt: str, model_name: str = "gpt-4o-mini") -> str:
     if not key:
         raise RuntimeError("OpenAI API key not found in st.secrets or OPENAI_API_KEY.")
     client = OpenAI(api_key=key)
-    resp = client.chat_completions.create(  # if your SDK uses .chat.completions.create, keep that
+    resp = client.chat.completions.create(  # if your SDK uses .chat.completions.create, keep that
         model=model_name,
         temperature=0.3,
         messages=[
