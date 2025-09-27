@@ -170,9 +170,7 @@ from openai import OpenAI
 
 st.subheader("AI Mood Explainer")
 
-# NOTE: for now you said you're fine hard-coding the key
-CLIENT = OpenAI(api_key=st.secrets["openai_api_key"])
-
+CLIENT = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
 # Build yesterday’s snapshot from your already-preprocessed `data`
 y = data.iloc[-1]
