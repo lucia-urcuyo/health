@@ -585,20 +585,17 @@ Context:
   • Avg Mood: {avg['mood_avg']:.2f}
 
 - Model output for tomorrow:
-  • Probability mood=good: {predicted_probability:.3f}
-  • Predicted mood label: {label}
+  • Probability mood=good: {predicted_probability:.3f}, consider this {label}
 
 - Feature contributions as SHAP values (feature → contribution):
   • {driver_lines}
 
 Task (answer in 6–8 short lines):
-1) State tomorrow’s predicted mood and probability.
-2) Explain briefly why, referencing the feature contributions and how current values compare to the 30-day averages (paraphrase as needed; no new variables).
-3) Based only on the measured variables (Hours of Sleep, Gym, Healthy Eats), explain:
+Summary: State tomorrow’s predicted mood and probability and explain briefly why, referencing the feature contributions and how current values compare to the 30-day averages (paraphrase as needed; no new variables).
+Recommendations: Based only on the measured variables (Hours of Sleep, Gym, Healthy Eats), explain:
    • What I’m currently doing well that supports a good mood.
    • What I could adjust in these same variables to boost my mood the day after tomorrow.
    Make recommendations specific and measurable, tied directly to the data provided.
-4) No medical claims.
 """
     return prompt
 
