@@ -1,5 +1,6 @@
 import helper_functions as hf
 import streamlit as st
+import pandas as pd
 
 
 file_id = '1E8QYsgwoIFwLbG4hNOiqGWzHK4yy8uOHm6Yg7nBXodQ'
@@ -25,6 +26,7 @@ st.set_page_config(page_title="My Dashboard", layout="centered", initial_sidebar
 # Sidebar Navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Monthly Comparison", "Mood Drivers and Insights"])
+
 
 
 # Define Each Page
@@ -72,6 +74,19 @@ def home():
         """,
         unsafe_allow_html=True
     )
+
+    # --- AI Mood Explainer ---
+    st.subheader("AI Mood Explainer")
+
+    # Ensure new_data is a DataFrame with the correct columns
+    new_data_df = new_data if isinstance(new_data, pd.DataFrame) else pd.DataFrame([new_data], columns=feature_columns)
+
+    prompt = hf.build_mood_prompt(data, new_data_df, feature_columns, hf.xgb_loaded)
+
+    if st.button("Explain tomorrow’s mood & suggest 3 actions"):
+        with st.spinner("Thinking..."):
+            text = hf.call_ai_mood_explainer(prompt)
+        st.markdown(text)
 
     # A Look to Yesterday's Stats Section
     st.header("A Look to Yesterday's Stats")
@@ -162,42 +177,3 @@ elif page == "Monthly Comparison":
     page1()
 elif page == "Mood Drivers and Insights":
     page2()
-
-
-
-# --- Simple AI Mood Explainer (paste inside home() after your charts) ---
-from openai import OpenAI
-
-st.subheader("AI Mood Explainer")
-
-CLIENT = OpenAI(api_key=st.secrets["openai"]["api_key"])
-
-# Build yesterday’s snapshot from your already-preprocessed `data`
-y = data.iloc[-1]
-prompt = f"""
-Here are my stats from yesterday:
-- Hours of Sleep: {y['Hours of Sleep']}
-- Gym (1=yes,0=no): {y['Gym']}
-- Healthy Eats (1=yes,0=no): {y['Healthy Eats']}
-- Mood of the Day (2=good,1=neutral,0=bad): {y['Mood of the Day']}
-
-In 6–8 short lines:
-1) Briefly explain why I might feel the way I do today (use only these stats).
-2) Give exactly 3 concrete actions I can do today to improve mood.
-Keep it practical and specific, no medical claims.
-"""
-
-if st.button("Explain my mood & suggest 3 actions"):
-    with st.spinner("Thinking..."):
-        resp = CLIENT.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.3,
-            messages=[
-                {"role": "system", "content": "You are a supportive, concise health coach."},
-                {"role": "user", "content": prompt},
-            ],
-        )
-    st.markdown(resp.choices[0].message.content)
-
-
-

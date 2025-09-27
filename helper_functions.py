@@ -488,3 +488,105 @@ def plot_shap_explanation(model, input_data):
     plt.tight_layout()
 
     return fig
+
+
+
+
+
+
+# --- AI helper: build prompt + call OpenAI ---
+
+from openai import OpenAI
+import os
+
+def _load_openai_key():
+    # supports either [openai].api_key table or root-level openai_api_key,
+    # and finally the OPENAI_API_KEY env var as a fallback.
+    if "openai" in st.secrets and "api_key" in st.secrets["openai"]:
+        return st.secrets["openai"]["api_key"]
+    if "openai_api_key" in st.secrets:
+        return st.secrets["openai_api_key"]
+    return os.getenv("OPENAI_API_KEY")
+
+def shap_contributions(model, input_df):
+    """Return SHAP contributions as a Series (sorted by |impact| desc)."""
+    explainer = shap.TreeExplainer(model)
+    vals = explainer.shap_values(input_df)  # shape (1, n_features)
+    s = pd.Series(vals[0], index=input_df.columns)
+    return s.reindex(s.abs().sort_values(ascending=False).index)
+
+def last30_averages(df):
+    """30-day averages for key metrics (assumes df sorted by Date)."""
+    last30 = df.tail(30).copy()
+    return {
+        "sleep": float(last30["Hours of Sleep"].mean()),
+        "gym_rate": float(last30["Gym"].mean()),
+        "healthy_rate": float(last30["Healthy Eats"].mean()),
+        "mood_avg": float(last30["Mood of the Day"].mean()),
+    }
+
+def build_mood_prompt(data, new_data_df, feature_columns, model):
+    """Assemble the LLM prompt with yesterday stats, 30-day avgs, prediction, and SHAP drivers."""
+    y = data.iloc[-1]
+    avg = last30_averages(data)
+
+    # prediction
+    prob = predict_mood_probability(model, new_data_df, feature_columns)
+    if prob >= 0.67:
+        label = "good (2)"
+    elif prob >= 0.33:
+        label = "neutral (1)"
+    else:
+        label = "bad (0)"
+
+    # shap top drivers
+    drivers = shap_contributions(model, new_data_df)
+    top3 = drivers.head(3)
+    top3_lines = [f"{k}: {v:+.3f}" for k, v in top3.items()]
+
+    prompt = f"""
+You are given:
+- Yesterday’s stats:
+  • Hours of Sleep: {y['Hours of Sleep']:.2f}
+  • Gym (1=yes,0=no): {int(y['Gym'])}
+  • Healthy Eats (1=yes,0=no): {int(y['Healthy Eats'])}
+  • Mood of the Day (2=good,1=neutral,0=bad): {int(y['Mood of the Day'])}
+
+- Last 30 days averages:
+  • Avg Hours of Sleep: {avg['sleep']:.2f}
+  • Gym rate: {avg['gym_rate']:.2f}
+  • Healthy Eats rate: {avg['healthy_rate']:.2f}
+  • Avg Mood: {avg['mood_avg']:.2f}
+
+- Model output for tomorrow:
+  • Probability mood=good: {prob:.3f}
+  • Predicted mood label: {label}
+
+- Top feature contributions (feature → SHAP value):
+  • {top3_lines[0] if len(top3_lines)>0 else 'n/a'}
+  • {top3_lines[1] if len(top3_lines)>1 else 'n/a'}
+  • {top3_lines[2] if len(top3_lines)>2 else 'n/a'}
+
+In 6–8 short lines:
+1) State tomorrow’s predicted mood and probability.
+2) Explain briefly why, referencing the top drivers and how current values compare to the 30-day averages (you may paraphrase the drivers; do not introduce new variables).
+3) Give exactly 3 specific, measurable actions for today (sleep, gym, healthy eats only) to maximize tomorrow’s mood.
+4) No medical claims.
+"""
+    return prompt
+
+def call_ai_mood_explainer(prompt, model_name="gpt-4o-mini"):
+    """Call OpenAI with our prompt and return the text."""
+    key = _load_openai_key()
+    if not key:
+        raise RuntimeError("OpenAI API key not found in st.secrets or OPENAI_API_KEY.")
+    client = OpenAI(api_key=key)
+    resp = client.chat.completions.create(
+        model=model_name,
+        temperature=0.3,
+        messages=[
+            {"role": "system", "content": "You are a supportive, concise health coach."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+    return resp.choices[0].message.content
