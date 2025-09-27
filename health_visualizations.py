@@ -81,15 +81,15 @@ def home():
     # precompute last-30 averages directly from x
     avg_dict = hf.last30_averages_from_x(x)
 
-    # Build prompt purely from x + precomputed values
+    # Build prompt (uses x for averages, new_data for "yesterday")
     prompt = hf.build_mood_prompt_from_x(
         x=x,
+        new_data=new_data,
         predicted_probability=predicted_probability,
         drivers=drivers_series,
-        averages=avg_dict, 
+        averages=avg_dict,  # or omit to compute inside
     )
 
-    # Call the explainer
     if st.button("Explain tomorrow’s mood & suggest 3 actions"):
         with st.spinner("Thinking..."):
             text = hf.call_ai_mood_explainer(prompt)

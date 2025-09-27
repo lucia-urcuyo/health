@@ -533,22 +533,29 @@ def format_all_shap(drivers: pd.Series) -> str:
     drivers = drivers.reindex(drivers.abs().sort_values(ascending=False).index)
     return "\n  • ".join([f"{feat}: {val:+.3f}" for feat, val in drivers.items()])
 
-# ---- prompt builder that uses ONLY x + precomputed values ----
+
+# ---- prompt builder using x for averages and new_data for yesterday ----
 def build_mood_prompt_from_x(
     x: pd.DataFrame,
+    new_data: pd.DataFrame | pd.Series,
     predicted_probability: float,
     drivers: pd.Series,
     averages: dict | None = None,
 ) -> str:
     """
-    Build the LLM prompt using ONLY:
-      - x: feature frame (includes human-readable cols like Hours of Sleep, Gym, Healthy Eats, Mood of the Day)
+    Build the LLM prompt using:
+      - x: full feature frame (for 30-day averages)
+      - new_data: the already-built single-row input for 'tomorrow' (yesterday's current values)
       - predicted_probability: precomputed model probability for 'good' mood
       - drivers: full SHAP Series (index = feature names)
       - averages: optional dict; if None, computed from x
     """
-    # yesterday = last row of x
-    y = x.iloc[-1]
+    # get the single row as a Series
+    if isinstance(new_data, pd.DataFrame):
+        y = new_data.iloc[0]
+    else:
+        y = new_data
+
     avg = averages or last30_averages_from_x(x)
     label = classify_mood_label(predicted_probability)
     driver_lines = format_all_shap(drivers)
@@ -600,7 +607,7 @@ def call_ai_mood_explainer(prompt: str, model_name: str = "gpt-4o-mini") -> str:
     if not key:
         raise RuntimeError("OpenAI API key not found in st.secrets or OPENAI_API_KEY.")
     client = OpenAI(api_key=key)
-    resp = client.chat.completions.create(
+    resp = client.chat_completions.create(  # if your SDK uses .chat.completions.create, keep that
         model=model_name,
         temperature=0.3,
         messages=[
@@ -608,4 +615,5 @@ def call_ai_mood_explainer(prompt: str, model_name: str = "gpt-4o-mini") -> str:
             {"role": "user", "content": prompt},
         ],
     )
+    # if you're on the new SDK, adjust the accessor accordingly
     return resp.choices[0].message.content
