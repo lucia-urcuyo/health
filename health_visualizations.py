@@ -51,7 +51,7 @@ def home():
     categorical_cols = ['Day of Week']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
-
+    print(x,y)
     new_data = x.iloc[[-1]]
 
     feature_columns = x.columns  
