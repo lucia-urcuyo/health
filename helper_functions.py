@@ -590,12 +590,16 @@ Context:
 - Feature contributions as SHAP values (feature → contribution):
   • {driver_lines}
 
-Task (answer in 6–8 short lines):
-Summary: State tomorrow’s predicted mood and probability and explain briefly why, referencing the feature contributions and how current values compare to the 30-day averages (paraphrase as needed; no new variables).
-Recommendations: Based only on the measured variables (Hours of Sleep, Gym, Healthy Eats), explain:
-   • What I’m currently doing well that supports a good mood.
-   • What I could adjust in these same variables to boost my mood the day after tomorrow.
-   Make recommendations specific and measurable, tied directly to the data provided.
+Task:
+- Summary: State tomorrow’s predicted mood and probability and explain briefly why, referencing the feature contributions and how current values compare to the 30-day averages (paraphrase as needed; no new variables).
+- Recommendations: Based only on the measured variables (Hours of Sleep, Gym, Healthy Eats), explain: 
+One: What I’m currently doing well that supports a good mood. 
+Two: What I could adjust in these same variables to boost my mood the day after tomorrow.
+
+Note:
+Just title of segment ('Summary' or 'Recommendations') and your response. Do not add numbers.
+Make recommendations specific and measurable, tied directly to the data provided.
+Keep your answers brief, 2-4 sentences each.
 """
     return prompt
 
