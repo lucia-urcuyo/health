@@ -7,7 +7,6 @@ file_id = '1E8QYsgwoIFwLbG4hNOiqGWzHK4yy8uOHm6Yg7nBXodQ'
 raw_data = hf.load_data_GD_API(file_id)
 print(raw_data)
 
-
 # raw_data = hf.load_data()
 # raw_data = raw_data.drop(columns=["Unnamed: 0"])
 
@@ -163,6 +162,44 @@ elif page == "Monthly Comparison":
     page1()
 elif page == "Mood Drivers and Insights":
     page2()
+
+
+
+# --- Simple AI Mood Explainer (paste inside home() after your charts) ---
+from openai import OpenAI
+
+st.subheader("AI Mood Explainer")
+
+# NOTE: for now you said you're fine hard-coding the key
+CLIENT = OpenAI(api_key=st.secrets["openai_api_key"])
+
+
+# Build yesterday’s snapshot from your already-preprocessed `data`
+y = data.iloc[-1]
+prompt = f"""
+Here are my stats from yesterday:
+- Hours of Sleep: {y['Hours of Sleep']}
+- Gym (1=yes,0=no): {y['Gym']}
+- Healthy Eats (1=yes,0=no): {y['Healthy Eats']}
+- Mood of the Day (2=good,1=neutral,0=bad): {y['Mood of the Day']}
+
+In 6–8 short lines:
+1) Briefly explain why I might feel the way I do today (use only these stats).
+2) Give exactly 3 concrete actions I can do today to improve mood.
+Keep it practical and specific, no medical claims.
+"""
+
+if st.button("Explain my mood & suggest 3 actions"):
+    with st.spinner("Thinking..."):
+        resp = CLIENT.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.3,
+            messages=[
+                {"role": "system", "content": "You are a supportive, concise health coach."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+    st.markdown(resp.choices[0].message.content)
 
 
 
