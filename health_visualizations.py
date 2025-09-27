@@ -54,7 +54,6 @@ def home():
     new_data = x.iloc[[-1]]
 
     feature_columns = x.columns  
-    st.markdown(f"{feature_columns}", unsafe_allow_html=True)
 
     # Make prediction
     predicted_probability = hf.predict_mood_probability(hf.xgb_loaded, new_data, feature_columns)
@@ -76,13 +75,21 @@ def home():
     )
 
     # --- AI Mood Explainer ---
-    st.subheader("AI Mood Explainer")
+    # Compute SHAP contributions once (Series indexed by feature names)
+    drivers_series = hf.shap_contributions(hf.xgb_loaded, new_data)
 
-    # Ensure new_data is a DataFrame with the correct columns
-    new_data_df = new_data if isinstance(new_data, pd.DataFrame) else pd.DataFrame([new_data], columns=feature_columns)
+    # precompute last-30 averages directly from x
+    avg_dict = hf.last30_averages_from_x(x)
 
-    prompt = hf.build_mood_prompt(data, new_data_df, feature_columns, hf.xgb_loaded)
+    # Build prompt purely from x + precomputed values
+    prompt = hf.build_mood_prompt_from_x(
+        x=x,
+        predicted_probability=predicted_probability,
+        drivers=drivers_series,
+        averages=avg_dict, 
+    )
 
+    # Call the explainer
     if st.button("Explain tomorrow’s mood & suggest 3 actions"):
         with st.spinner("Thinking..."):
             text = hf.call_ai_mood_explainer(prompt)

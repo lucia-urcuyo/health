@@ -499,25 +499,28 @@ def plot_shap_explanation(model, input_data):
 from openai import OpenAI
 import os
 
+# ---- secrets loader ----
 def _load_openai_key():
-    # supports either [openai].api_key table or root-level openai_api_key,
-    # and finally the OPENAI_API_KEY env var as a fallback.
     if "openai" in st.secrets and "api_key" in st.secrets["openai"]:
         return st.secrets["openai"]["api_key"]
     if "openai_api_key" in st.secrets:
         return st.secrets["openai_api_key"]
     return os.getenv("OPENAI_API_KEY")
 
-def shap_contributions(model, input_df):
-    """Return SHAP contributions as a Series (sorted by |impact| desc)."""
-    explainer = shap.TreeExplainer(model)
-    vals = explainer.shap_values(input_df)  # shape (1, n_features)
-    s = pd.Series(vals[0], index=input_df.columns)
-    return s.reindex(s.abs().sort_values(ascending=False).index)
+# ---- small utils ----
+def classify_mood_label(prob: float) -> str:
+    if prob >= 0.85:
+        return "good"
+    elif prob >= 0.75:
+        return "ok"
+    elif prob >= 0.50:
+        return "not so good"
+    else:
+        return "bad"
 
-def last30_averages(df):
-    """30-day averages for key metrics (assumes df sorted by Date)."""
-    last30 = df.tail(30).copy()
+def last30_averages_from_x(x: pd.DataFrame) -> dict:
+    """Compute 30-day (last 30 rows) averages directly from x."""
+    last30 = x.tail(30).copy()
     return {
         "sleep": float(last30["Hours of Sleep"].mean()),
         "gym_rate": float(last30["Gym"].mean()),
@@ -525,76 +528,74 @@ def last30_averages(df):
         "mood_avg": float(last30["Mood of the Day"].mean()),
     }
 
-def build_mood_prompt(data, new_data_df, feature_columns, model):
-    """Assemble the LLM prompt with yesterday stats, 30-day avgs, prediction, and SHAP drivers."""
-    y = data.iloc[-1]
-    avg = last30_averages(data)
+def format_all_shap(drivers: pd.Series) -> str:
+    # Ensure descending by absolute impact
+    drivers = drivers.reindex(drivers.abs().sort_values(ascending=False).index)
+    return "\n  • ".join([f"{feat}: {val:+.3f}" for feat, val in drivers.items()])
 
-    # prediction
-    prob = predict_mood_probability(model, new_data_df, feature_columns)
-    if prob >= 0.85:
-        label = "good"
-    elif prob >= 0.75:
-        label = "ok"
-    elif prob >= 0.50:
-        label = "not so good"
-    else:
-        label = "bad"
-
-
-    # shap top drivers
-    drivers = shap_contributions(model, new_data_df)
-    top3 = drivers.head(3)
-    top3_lines = [f"{k}: {v:+.3f}" for k, v in top3.items()]
+# ---- prompt builder that uses ONLY x + precomputed values ----
+def build_mood_prompt_from_x(
+    x: pd.DataFrame,
+    predicted_probability: float,
+    drivers: pd.Series,
+    averages: dict | None = None,
+) -> str:
+    """
+    Build the LLM prompt using ONLY:
+      - x: feature frame (includes human-readable cols like Hours of Sleep, Gym, Healthy Eats, Mood of the Day)
+      - predicted_probability: precomputed model probability for 'good' mood
+      - drivers: full SHAP Series (index = feature names)
+      - averages: optional dict; if None, computed from x
+    """
+    # yesterday = last row of x
+    y = x.iloc[-1]
+    avg = averages or last30_averages_from_x(x)
+    label = classify_mood_label(predicted_probability)
+    driver_lines = format_all_shap(drivers)
 
     prompt = f"""
-You are given:
+Context:
 - Yesterday’s stats:
-  • Hours of Sleep: {y['Hours of Sleep']:.2f}
+  • Hours of Sleep: {float(y['Hours of Sleep']):.2f}
   • Gym (1=yes,0=no): {int(y['Gym'])}
-  • Healthy Eats (1=yes,0=no): {int(y['Healthy Eats'])}
+  • Healthy Eats (self-rated, 1–10): {int(y['Healthy Eats'])}
   • Mood of the Day (2=good,1=neutral,0=bad): {int(y['Mood of the Day'])}
 
-- Last 30 days averages:
+- Last 30 days averages (from tracked metrics):
   • Avg Hours of Sleep: {avg['sleep']:.2f}
   • Gym rate: {avg['gym_rate']:.2f}
   • Healthy Eats rate: {avg['healthy_rate']:.2f}
   • Avg Mood: {avg['mood_avg']:.2f}
 
 - Model output for tomorrow:
-  • Probability mood=good: {prob:.3f}
+  • Probability mood=good: {predicted_probability:.3f}
   • Predicted mood label: {label}
 
-- Top feature contributions (feature → SHAP value):
-  • {top3_lines[0] if len(top3_lines)>0 else 'n/a'}
-  • {top3_lines[1] if len(top3_lines)>1 else 'n/a'}
-  • {top3_lines[2] if len(top3_lines)>2 else 'n/a'}
+- Feature contributions as SHAP values (feature → contribution):
+  • {driver_lines}
 
-In 6–8 short lines:
+Task (answer in 6–8 short lines):
 1) State tomorrow’s predicted mood and probability.
-2) Explain briefly why, referencing the top drivers and how current values compare to the 30-day averages (you may paraphrase the drivers; do not introduce new variables).
-3) Give exactly 3 specific, measurable actions for today (sleep, gym, healthy eats only) to maximize tomorrow’s mood.
+2) Explain briefly why, referencing the feature contributions and how current values compare to the 30-day averages (paraphrase as needed; no new variables).
+3) Based only on the measured variables (Hours of Sleep, Gym, Healthy Eats), explain:
+   • What I’m currently doing well that supports a good mood.
+   • What I could adjust in these same variables to boost my mood the day after tomorrow.
+   Make recommendations specific and measurable, tied directly to the data provided.
 4) No medical claims.
 """
     return prompt
 
+# ---- system prompt + caller ----
 SYSTEM_PROMPT = """
-You are a professional medical expert with decades of experience in psychiatry, psychology, and wellness science. 
+You are a professional medical expert with decades of experience in psychiatry, psychology, and wellness science.
 You combine deep scientific and clinical knowledge with advanced expertise in data science and machine learning.
-
-Your role is to:
-- Interpret mood prediction outputs from statistical and machine learning models.
-- Explain probabilistic forecasts and SHAP (SHapley Additive exPlanations) values clearly and accurately.
-- Discuss the likely causal effects of variables (e.g., sleep, exercise, nutrition) on mood, grounding your reasoning in established scientific knowledge.
-- Provide practical, evidence-informed recommendations to improve mood, phrased in a supportive and professional tone.
-- Always stay rigorous, concise, and data-driven—bridge the gap between medical science and data science.
-- Do not make unsupported medical claims or diagnoses. Limit recommendations to safe, practical lifestyle adjustments tied to the provided data.
-
-You are both a scientist and a mentor: authoritative yet approachable. Your explanations should inspire confidence, balancing scientific precision with clarity for a non-technical reader.
+Your role is to interpret mood predictions, explain probabilities and SHAP values clearly, discuss likely causal effects
+of variables (sleep, exercise, nutrition), and provide practical, evidence-informed recommendations. Be rigorous, concise,
+and data-driven. Do not make unsupported medical claims or diagnoses; limit suggestions to safe lifestyle adjustments.
+You are a top notch scientist: confident and data oriented.
 """
 
-def call_ai_mood_explainer(prompt, model_name="gpt-4o-mini"):
-    """Call OpenAI with our prompt and return the text."""
+def call_ai_mood_explainer(prompt: str, model_name: str = "gpt-4o-mini") -> str:
     key = _load_openai_key()
     if not key:
         raise RuntimeError("OpenAI API key not found in st.secrets or OPENAI_API_KEY.")
