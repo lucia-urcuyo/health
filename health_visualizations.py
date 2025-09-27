@@ -77,6 +77,7 @@ def home():
     # --- AI Mood Explainer ---
     # Compute SHAP contributions once (Series indexed by feature names)
     drivers_series = hf.shap_contributions(hf.xgb_loaded, new_data)
+    driver_lines = hf.format_all_shap(drivers_series)
 
     # precompute last-30 averages directly from x
     avg_dict = hf.last30_averages_from_x(x)

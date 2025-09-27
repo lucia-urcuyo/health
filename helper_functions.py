@@ -528,6 +528,16 @@ def last30_averages_from_x(x: pd.DataFrame) -> dict:
         "mood_avg": float(last30["Mood of the Day"].mean()),
     }
 
+def shap_contributions(model, input_df: pd.DataFrame) -> pd.Series:
+    """
+    Return SHAP contributions as a Pandas Series for a single input row.
+    Sorted by absolute impact (descending).
+    """
+    explainer = shap.TreeExplainer(model)
+    vals = explainer.shap_values(input_df)  # shape (1, n_features)
+    s = pd.Series(vals[0], index=input_df.columns)
+    return s.reindex(s.abs().sort_values(ascending=False).index)
+
 def format_all_shap(drivers: pd.Series) -> str:
     # Ensure descending by absolute impact
     drivers = drivers.reindex(drivers.abs().sort_values(ascending=False).index)
