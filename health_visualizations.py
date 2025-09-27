@@ -51,10 +51,10 @@ def home():
     categorical_cols = ['Day of Week']
 
     x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
-    st.markdown(f"{x}", unsafe_allow_html=True)
     new_data = x.iloc[[-1]]
 
     feature_columns = x.columns  
+    st.markdown(f"{feature_columns}", unsafe_allow_html=True)
 
     # Make prediction
     predicted_probability = hf.predict_mood_probability(hf.xgb_loaded, new_data, feature_columns)
