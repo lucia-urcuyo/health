@@ -11,3 +11,4 @@ streamlit==1.37.0
 google-auth==2.34.0
 google-api-python-client==2.137.0
 openai==1.37.1
+requests-cache==1.2.0
