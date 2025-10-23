@@ -617,6 +617,13 @@ def call_ai_mood_explainer(prompt: str, model_name: str = "gpt-4o-mini") -> str:
     key = _load_openai_key()
     if not key:
         raise RuntimeError("OpenAI API key not found in st.secrets or OPENAI_API_KEY.")
+    import os
+
+    # Prevent Streamlit's proxy injection issue
+    os.environ.pop("HTTP_PROXY", None)
+    os.environ.pop("HTTPS_PROXY", None)
+    os.environ.pop("ALL_PROXY", None)
+
     client = OpenAI(api_key=key)
     resp = client.chat.completions.create(  # if your SDK uses .chat.completions.create, keep that
         model=model_name,
