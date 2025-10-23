@@ -624,7 +624,8 @@ def call_ai_mood_explainer(prompt: str, model_name: str = "gpt-4o-mini") -> str:
     os.environ.pop("HTTPS_PROXY", None)
     os.environ.pop("ALL_PROXY", None)
 
-    client = OpenAI(api_key=key)
+    from httpx import Client as HTTPClient
+    client = OpenAI(api_key=key, http_client=HTTPClient(proxies=None))
     resp = client.chat.completions.create(  # if your SDK uses .chat.completions.create, keep that
         model=model_name,
         temperature=0.3,
