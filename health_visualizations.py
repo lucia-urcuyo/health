@@ -140,7 +140,7 @@ def page1():
     st.subheader(f"{options[selected_column]}: This Month vs Last Month")
 
     # Generate and display the cumulative comparison line chart
-    fig = hf.cumulative_monthly_line_chart(data, selected_column)
+    fig = hf.cumulative_last_30_days_comparison(data, selected_column)
     st.plotly_chart(fig)
 
 

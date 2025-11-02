@@ -393,46 +393,50 @@ xgb_loaded = XGBClassifier()
 xgb_loaded.load_model("xgboost_mood_model.json")
 
 
-def cumulative_monthly_line_chart(df, column_to_sum):
+def cumulative_last_30_days_comparison(df, column_to_sum):
     """
-    Generates a cumulative Plotly line chart comparing last month's progress vs this month's (to date).
-    
+    Generates a cumulative Plotly line chart comparing the last 30 days vs the previous 30 days.
+
     Parameters:
-        df (pd.DataFrame): Preprocessed DataFrame with a 'Date' column
-        column_to_sum (str): Column to aggregate cumulatively (e.g., 'Hours of Sleep')
-    
+        df (pd.DataFrame): DataFrame with a 'Date' column in datetime format.
+        column_to_sum (str): Column to aggregate cumulatively.
+
     Returns:
-        fig (plotly.graph_objs._figure.Figure): Plotly figure with the plot
+        fig (plotly.graph_objs._figure.Figure): Plotly figure with the plot.
     """
     df = df.copy()
-    df['Month'] = df['Date'].dt.to_period('M')
-    df['Day'] = df['Date'].dt.day
+    df['Date'] = pd.to_datetime(df['Date'])
 
-    # Identify current and last month
-    current_month = pd.Timestamp.now().to_period('M')
-    last_month = current_month - 1
+    today = pd.Timestamp.now().normalize()
+    current_30_start = today - pd.Timedelta(days=29)
+    previous_30_start = current_30_start - pd.Timedelta(days=30)
+    previous_30_end = current_30_start - pd.Timedelta(days=1)
 
     # Filter data
-    last_month_df = df[df['Month'] == last_month].copy()
-    current_month_df = df[df['Month'] == current_month].copy()
+    current_30_df = df[(df['Date'] >= current_30_start) & (df['Date'] <= today)].copy()
+    previous_30_df = df[(df['Date'] >= previous_30_start) & (df['Date'] <= previous_30_end)].copy()
 
-    # Group by day and calculate cumulative sum
-    last_month_daily = last_month_df.groupby('Day')[column_to_sum].sum().sort_index().cumsum()
-    current_month_daily = current_month_df.groupby('Day')[column_to_sum].sum().sort_index().cumsum()
+    # Assign day indices (0 to 29)
+    current_30_df['DayIndex'] = (current_30_df['Date'] - current_30_start).dt.days
+    previous_30_df['DayIndex'] = (previous_30_df['Date'] - previous_30_start).dt.days
 
-    # Align the days (1 to 31)
-    days_range = range(1, 32)
-    last_month_cum = last_month_daily.reindex(days_range, fill_value=np.nan)
-    current_month_cum = current_month_daily.reindex(days_range, fill_value=np.nan)
+    # Group and compute cumulative sums
+    current_cum = current_30_df.groupby('DayIndex')[column_to_sum].sum().sort_index().cumsum()
+    previous_cum = previous_30_df.groupby('DayIndex')[column_to_sum].sum().sort_index().cumsum()
 
-    # Create Plotly figure
+    # Reindex to align both series
+    days_range = range(30)
+    current_cum = current_cum.reindex(days_range, fill_value=np.nan)
+    previous_cum = previous_cum.reindex(days_range, fill_value=np.nan)
+
+    # Plot
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
         x=list(days_range),
-        y=last_month_cum,
+        y=previous_cum,
         mode='lines',
-        name=f'Last Month ({last_month})',
+        name='Previous 30 Days',
         line=dict(color='gray', dash='dash'),
         marker=dict(size=8),
         hovertemplate="Day %{x}: %{y:.1f}<extra></extra>"
@@ -440,25 +444,24 @@ def cumulative_monthly_line_chart(df, column_to_sum):
 
     fig.add_trace(go.Scatter(
         x=list(days_range),
-        y=current_month_cum,
+        y=current_cum,
         mode='lines',
-        name=f'Current Month ({current_month})',
+        name='Last 30 Days',
         line=dict(color='royalblue'),
         marker=dict(size=8),
         hovertemplate="Day %{x}: %{y:.1f}<extra></extra>"
     ))
 
-    # Layout adjustments
     fig.update_layout(
-        xaxis_title='Day of the Month',
+        xaxis_title='Day (0 = Earliest)',
         yaxis_title=f'Cumulative {column_to_sum}',
         hovermode='closest',
         template="plotly_white",
         margin=dict(l=50, r=50, t=50, b=50),
         legend=dict(
-            orientation="h",           # horizontal legend
+            orientation="h",
             yanchor="bottom",
-            y=1.1,                     # moves legend above the plot
+            y=1.1,
             xanchor="center",
             x=0.5,
             font=dict(size=12)
