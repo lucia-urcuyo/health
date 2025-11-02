@@ -424,43 +424,41 @@ def cumulative_last_30_days_comparison(df, column_to_sum):
     current_cum = current_30_df.groupby('DayIndex')[column_to_sum].sum().sort_index().cumsum()
     previous_cum = previous_30_df.groupby('DayIndex')[column_to_sum].sum().sort_index().cumsum()
 
-    # Define date ranges for x-axis labels
+    # Reindex to align both series
+    days_range = range(30)
+    current_cum = current_cum.reindex(days_range, fill_value=np.nan)
+    previous_cum = previous_cum.reindex(days_range, fill_value=np.nan)
+
     previous_dates = [previous_30_start + pd.Timedelta(days=i) for i in range(30)]
     current_dates = [current_30_start + pd.Timedelta(days=i) for i in range(30)]
-
-    # Reindex with 0 before cumulative sum
-    current_daily = current_30_df.groupby('DayIndex')[column_to_sum].sum().reindex(range(30), fill_value=0)
-    previous_daily = previous_30_df.groupby('DayIndex')[column_to_sum].sum().reindex(range(30), fill_value=0)
-
-    current_cum = current_daily.cumsum()
-    previous_cum = previous_daily.cumsum()
 
     # Plot
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
-        x=previous_dates,
+        x=list(range(30)),
         y=previous_cum,
         mode='lines',
         name='Previous 30 Days',
         line=dict(color='gray', dash='dash'),
         marker=dict(size=8),
-        hovertemplate="%{x|%b %d}: %{y:.1f}<extra></extra>"
+        customdata=np.array(previous_dates),  # attaches dates to each point
+        hovertemplate="Date %{customdata|%b %d}: %{y:.1f}<extra></extra>"
     ))
 
     fig.add_trace(go.Scatter(
-        x=current_dates,
+        x=list(range(30)),
         y=current_cum,
         mode='lines',
         name='Last 30 Days',
         line=dict(color='royalblue'),
         marker=dict(size=8),
-        hovertemplate="%{x|%b %d}: %{y:.1f}<extra></extra>"
+        customdata=np.array(current_dates),
+        hovertemplate="Date %{customdata|%b %d}: %{y:.1f}<extra></extra>"
     ))
 
-    # Layout
     fig.update_layout(
-        xaxis_title='Date',
+        xaxis_title='Day (0 = Earliest)',
         yaxis_title=f'Cumulative {column_to_sum}',
         hovermode='closest',
         template="plotly_white",
@@ -474,6 +472,7 @@ def cumulative_last_30_days_comparison(df, column_to_sum):
             font=dict(size=12)
         )
     )
+
     return fig
 
 
