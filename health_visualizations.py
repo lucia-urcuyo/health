@@ -156,8 +156,23 @@ def page2():
     logreg_model, features = hf.load_logreg_manual_model()
     new_data = feature_frame.iloc[[-1]]
     contrib = hf.logreg_good_class_contributions(logreg_model, features, new_data)
-    st.write("Top positive/negative contributors to good mood (coef * value):")
-    st.write(contrib.head(10))
+
+    top_n = 10
+    contrib_top = contrib.head(top_n)
+
+    import plotly.express as px
+    fig = px.bar(
+        contrib_top.sort_values(),
+        x=contrib_top.sort_values(),
+        y=contrib_top.sort_values().index,
+        orientation='h',
+        color=contrib_top.sort_values(),
+        color_continuous_scale='RdBu',
+        color_continuous_midpoint=0,
+        labels={'x': 'Contribution (coef * value)', 'y': 'Feature'},
+        title='Top contributors to good mood (today’s inputs)'
+    )
+    st.plotly_chart(fig, use_container_width=True)
 # Page Selection Logic
 if page == "Home":
     home()
