@@ -10,11 +10,10 @@ import streamlit as st
 
 import plotly.graph_objects as go
 
-from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LogisticRegression
+import joblib, json
 import numpy as np
-
-import shap
 
 def load_data():
     return pd.read_csv('data.csv')
@@ -304,93 +303,59 @@ def create_metric_st(yesterday_val, percentage_change, title, container):
             </div>
         """, unsafe_allow_html=True)
 
-def preprocess_data_for_modeling_binary_y(raw_data, numeric_columns=None, categorical_cols=None, columns_to_drop=None):
-
-    # Create a copy of the data frame
+def preprocess_for_logreg_manual(raw_data, numeric_columns=None, columns_to_drop=None):
+    """
+    Preprocess data to match the handpicked multinomial logistic regression features.
+    Returns the engineered feature frame (no target column).
+    """
     data = raw_data.copy()
 
-    # Drop unnecessary columns
     if columns_to_drop:
         data.drop(columns_to_drop, axis=1, inplace=True)
 
-    # Convert specified columns to numeric, if provided
     if numeric_columns:
         for col in numeric_columns:
-            data[col] = pd.to_numeric(data[col], errors='coerce')  # Coerce invalid values to NaN
+            data[col] = pd.to_numeric(data[col], errors='coerce')
 
-    # Ensure the Date column is in datetime format
     data['Date'] = pd.to_datetime(data['Date'])
+    data = data.sort_values(by='Date').reset_index(drop=True)
 
-    # Add a column for the day of the week
-    data['Day of Week'] = data['Date'].dt.day_name()  
+    data['Day_sin'] = np.sin(2 * np.pi * data['Date'].dt.weekday / 7)
+    data['Day_cos'] = np.cos(2 * np.pi * data['Date'].dt.weekday / 7)
+    data['Is Weekend'] = data['Date'].dt.day_name().isin(['Saturday', 'Sunday']).astype(int)
 
-    # One-hot encode categorical columns (if provided)
-    if categorical_cols:
-        data = pd.get_dummies(data, columns=categorical_cols, drop_first=True)
-
-    # Sort the DataFrame by the Date column
-    data = data.sort_values(by='Date')
-
-    # Reset the index
-    data = data.reset_index(drop=True)
-
-    # Create dictionaries for values that are 'emojis'
     emoji_to_int_mood = {':(':0, ':/':1, ':)':2}
     emoji_to_int_gym = {'No Gym':0, ':(':1, ':/':2, ':)':3}
-
-    # Map emojis to integer values
     data['Mood of the Day'] = data['Mood of the Day'].map(emoji_to_int_mood)
     data['Gym Motivation'] = data['Gym Motivation'].map(emoji_to_int_gym)
-    data['Gym'] = (data['Gym Motivation']>0).astype(int)
+    data['Gym'] = (data['Gym Motivation'] > 0).astype(int)
 
-    # Transform the values 'Mood of the Day' column to binary
-    data['Mood of the Day Binary'] = data['Mood of the Day'].apply(lambda x: 1 if x == 2 else 0)
-
-    # Calculate rolling sums for specific columns
     data['Vitamins Rolling Sum 7'] = data['Vitamins?'].rolling(window=7).sum().fillna(0)
-    data['Hours of Sleep Rolling Sum 4'] = data['Hours of Sleep'].rolling(window=4).sum()
     data['Creatine Rolling Sum 7'] = data['Creatine?'].rolling(window=7).sum()
-    data['Gym Rolling Sum 4'] = data['Gym'].rolling(window=4).sum()
-    data['Healthy Eats Rolling Sum 4'] = data['Healthy Eats'].rolling(window=4).sum()
-    data['Mood of the Day Rolling Sum 4'] = data['Mood of the Day'].rolling(window=4).sum()
 
-    # Crete my y variable by shifting the binaty mood of the day variable two periods forward
-    data['Independent Variable'] = data['Mood of the Day Binary'].shift(periods=2)
+    data['Sleep EWM'] = data['Hours of Sleep'].ewm(span=5).mean()
+    data['Mood EWM'] = data['Mood of the Day'].ewm(span=5).mean()
+    data['Healthy Eats EWM'] = data['Healthy Eats'].ewm(span=5).mean()
+    data['Gym Motivation EWM'] = data['Gym Motivation'].ewm(span=5).mean()
 
-    # Drop rows with missing values
+    data['Caffeine Consumption'] = data['Caffeine Consumption'].fillna(0)
+
     data = data.dropna()
+    return data
 
-    x= data.drop(columns=['Date', 'Independent Variable', 'Mood of the Day Binary', 'Location'])
-    y= data['Independent Variable']
+def load_logreg_manual_model(model_path="models/logreg_manual_full.pkl", feature_path="models/logreg_manual_features.json"):
+    model = joblib.load(model_path)
+    with open(feature_path) as f:
+        features = json.load(f)
+    return model, features
 
-    return x, y
-
-def predict_mood_probability(xgb_model, new_data_point, feature_columns):
+def predict_good_mood_probability(logreg_model, features, feature_frame):
     """
-    Predicts the probability of being in a good mood (1) using the trained XGBoost model.
-    
-    Parameters:
-        xgb_model: Trained XGBoost model
-        new_data_point: List, NumPy array, or Pandas Series with feature values
-        feature_columns: List of feature names used for training
-        
-    Returns:
-        float: Probability of being in a good mood (1)
+    Returns per-class probabilities and the 'good mood' probability (class=2) for the latest row.
     """
-    # # Ensure input is a DataFrame with correct column names
-    if isinstance(new_data_point, (list, np.ndarray)):
-        new_data_point = pd.DataFrame([new_data_point], columns=feature_columns)
-    elif isinstance(new_data_point, pd.Series):
-        new_data_point = new_data_point.to_frame().T  # Convert Series to DataFrame
-
-    # Make probability prediction
-    mood_probability = xgb_model.predict_proba(new_data_point)[:, 1][0]  # Probability of "Good Mood" (1)
-    
-    return mood_probability
-
-# Load the model without retraining 
-xgb_loaded = XGBClassifier()
-xgb_loaded.load_model("xgboost_mood_model.json")
+    row = feature_frame[features].iloc[[-1]]
+    probs = logreg_model.predict_proba(row)[0]
+    return probs, probs[2]
 
 
 def cumulative_last_30_days_comparison(df, column_to_sum):
@@ -476,31 +441,6 @@ def cumulative_last_30_days_comparison(df, column_to_sum):
     return fig
 
 
-def plot_shap_explanation(model, input_data):
-    """
-    Generate a SHAP waterfall plot explaining the model's prediction on the latest input data.
-    """
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(input_data)
-
-    # Manually create a SHAP Explanation object with feature names
-    explanation = shap.Explanation(
-        values=shap_values[0],
-        base_values=explainer.expected_value,
-        data=input_data.iloc[0].values,
-        feature_names=input_data.columns.tolist()
-    )
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    shap.plots.waterfall(explanation, show=False)
-    plt.tight_layout()
-
-    return fig
-
-
-
-
-
 
 # --- AI helper: build prompt + call OpenAI ---
 
@@ -536,20 +476,16 @@ def last30_averages_from_x(x: pd.DataFrame) -> dict:
         "mood_avg": float(last30["Mood of the Day"].mean()),
     }
 
-def shap_contributions(model, input_df: pd.DataFrame) -> pd.Series:
+def logreg_good_class_contributions(model, features: list, row_df: pd.DataFrame) -> pd.Series:
     """
-    Return SHAP contributions as a Pandas Series for a single input row.
-    Sorted by absolute impact (descending).
+    For multinomial logistic regression, compute class-2 (good mood) logit contributions:
+    coefficient * feature_value for the provided row.
+    Returns a Series sorted by absolute contribution descending.
     """
-    explainer = shap.TreeExplainer(model)
-    vals = explainer.shap_values(input_df)  # shape (1, n_features)
-    s = pd.Series(vals[0], index=input_df.columns)
-    return s.reindex(s.abs().sort_values(ascending=False).index)
-
-def format_all_shap(drivers: pd.Series) -> str:
-    # Ensure descending by absolute impact
-    drivers = drivers.reindex(drivers.abs().sort_values(ascending=False).index)
-    return "\n  • ".join([f"{feat}: {val:+.3f}" for feat, val in drivers.items()])
+    row = row_df[features].iloc[0]
+    coef = pd.Series(model.coef_[2], index=features)  # class 2 row of coef matrix
+    contrib = coef * row
+    return contrib.reindex(contrib.abs().sort_values(ascending=False).index)
 
 
 # ---- prompt builder using x for averages and new_data for yesterday ----
@@ -565,7 +501,7 @@ def build_mood_prompt_from_x(
       - x: full feature frame (for 30-day averages)
       - new_data: the already-built single-row input for 'tomorrow' (yesterday's current values)
       - predicted_probability: precomputed model probability for 'good' mood
-      - drivers: full SHAP Series (index = feature names)
+      - drivers: coefficient*value contributions Series (index = feature names)
       - averages: optional dict; if None, computed from x
     """
     # get the single row as a Series
@@ -576,7 +512,7 @@ def build_mood_prompt_from_x(
 
     avg = averages or last30_averages_from_x(x)
     label = classify_mood_label(predicted_probability)
-    driver_lines = format_all_shap(drivers)
+    driver_lines = "\n  • ".join([f"{feat}: {val:+.3f}" for feat, val in drivers.items()])
 
     prompt = f"""
 Context:
@@ -595,7 +531,7 @@ Context:
 - Model output for tomorrow:
   • Probability mood=good: {predicted_probability:.3f}, consider this {label}
 
-- Feature contributions as SHAP values (feature → contribution):
+- Feature contributions from the logistic regression (feature → coef*value for class=good):
   • {driver_lines}
 
 Task:
@@ -615,7 +551,7 @@ Keep your answers brief, 2-4 sentences each.
 SYSTEM_PROMPT = """
 You are a professional medical expert with decades of experience in psychiatry, psychology, and wellness science.
 You combine deep scientific and clinical knowledge with advanced expertise in data science and machine learning.
-Your role is to interpret mood predictions, explain probabilities and SHAP values clearly, discuss likely causal effects
+Your role is to interpret mood predictions, explain probabilities and mood drivers and insights clearly, discuss likely causal effects
 of variables (sleep, exercise, nutrition), and provide practical, evidence-informed recommendations. Be rigorous, concise,
 and data-driven. Do not make unsupported medical claims or diagnoses; limit suggestions to safe lifestyle adjustments.
 You are a top notch scientist: confident and data oriented.

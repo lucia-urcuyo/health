@@ -46,17 +46,11 @@ def home():
     st.markdown("<h1 style='text-align: center;'>Mood Prediction Dashboard</h1>", unsafe_allow_html=True)
 
     # Prepare data for prediction
-    numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
-    columns_to_drop = ['Timestamp']
-    categorical_cols = ['Day of Week']
-
-    x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
-    new_data = x.iloc[[-1]]
-
-    feature_columns = x.columns  
-
-    # Make prediction
-    predicted_probability = hf.predict_mood_probability(hf.xgb_loaded, new_data, feature_columns)
+    # Preprocess for multinomial logistic regression (handpicked features)
+    feature_frame = hf.preprocess_for_logreg_manual(raw_data, numeric_columns, columns_to_drop)
+    logreg_model, features = hf.load_logreg_manual_model()
+    probs_all, predicted_probability = hf.predict_good_mood_probability(logreg_model, features, feature_frame)
+    new_data = feature_frame.iloc[[-1]]
 
     # Determine color based on predicted value
     gradient_color = f"rgb({255 - int(predicted_probability * 255)}, {int(predicted_probability * 255)}, 0)"
@@ -75,20 +69,15 @@ def home():
     )
 
     # --- AI Mood Explainer ---
-    # Compute SHAP contributions once (Series indexed by feature names)
-    drivers_series = hf.shap_contributions(hf.xgb_loaded, new_data)
-    driver_lines = hf.format_all_shap(drivers_series)
+    drivers_series = hf.logreg_good_class_contributions(logreg_model, features, new_data)
+    avg_dict = hf.last30_averages_from_x(feature_frame)
 
-    # precompute last-30 averages directly from x
-    avg_dict = hf.last30_averages_from_x(x)
-
-    # Build prompt (uses x for averages, new_data for "yesterday")
     prompt = hf.build_mood_prompt_from_x(
-        x=x,
+        x=feature_frame,
         new_data=new_data,
         predicted_probability=predicted_probability,
         drivers=drivers_series,
-        averages=avg_dict,  # or omit to compute inside
+        averages=avg_dict,
     )
 
     if st.button("Explain tomorrow’s mood & suggest 3 actions"):
@@ -161,23 +150,14 @@ def page2():
                                      df=data)
     st.pyplot(fig)
 
-    # ---- SHAP Explainability Section ----
-    st.header("SHAP Explanation: What Influenced Tomorrow's Mood Prediction?")
-
-    # Recreate the input for prediction
-    numeric_columns = ['Caffeine Consumption', 'Vitamins?', 'Creatine?', 'Alcohol?', 'Bread?', 'Hours of Sleep', 'Healthy Eats']
-    categorical_cols = ['Day of Week']
-    columns_to_drop = ['Timestamp']
-
-    x, y = hf.preprocess_data_for_modeling_binary_y(raw_data, numeric_columns, categorical_cols, columns_to_drop)
-    new_data = x.iloc[[-1]]  # Latest row for prediction
-
-    # Call the helper function to get the SHAP plot
-    fig = hf.plot_shap_explanation(hf.xgb_loaded, new_data)
-    st.pyplot(fig)
-
-
-
+    # Coefficient-based explanation
+    st.header("What drove tomorrow's prediction?")
+    feature_frame = hf.preprocess_for_logreg_manual(raw_data, numeric_columns, columns_to_drop)
+    logreg_model, features = hf.load_logreg_manual_model()
+    new_data = feature_frame.iloc[[-1]]
+    contrib = hf.logreg_good_class_contributions(logreg_model, features, new_data)
+    st.write("Top positive/negative contributors to good mood (coef * value):")
+    st.write(contrib.head(10))
 # Page Selection Logic
 if page == "Home":
     home()
